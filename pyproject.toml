@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "steer"
+version = "0.1.0"
+description = ""
+authors = ["José Coelho <16445494+jcoelho93@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+click = "8.1.7"
+pydantic = "^2.7.1"
+questionary = "^2.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
