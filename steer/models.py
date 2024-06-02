@@ -12,6 +12,7 @@ class Property(BaseModel):
     ref: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
+    default: Optional[Any] = None
     allOf: Optional[List[BaseModel]] = None
     path: Optional[Any] = None
     value: Optional[Any] = None
@@ -30,13 +31,30 @@ class Property(BaseModel):
         if self.value:
             self.path.update_or_create(data, self.value)
 
+    def _get_prompt_args(self):
+        args = {
+            'name': self.name,
+            'message': f"{self.name} ({self.type}): ",
+            'default': self.default,
+        }
+        return {k: v for k, v in args.items() if v is not None}
+
 
 class StringProperty(Property):
     type: str = 'string'
     format: Optional[str] = None
-    default: Optional[str] = None
-    enum: Optional[List[str]] = None
     pattern: Optional[str] = None
+    enum: Optional[List[str]] = None
+
+    def _get_prompt_args(self):
+        args = {
+            'type': 'select' if self.enum else 'input',
+            'name': self.name,
+            'message': f"{self.name} ({self.type}): ",
+            'default': self.default,
+            'choices': self.enum
+        }
+        return {k: v for k, v in args.items() if v is not None}
 
     @classmethod
     def from_dict(cls, key, obj, parent):
@@ -51,25 +69,13 @@ class StringProperty(Property):
         )
 
     def prompt(self):
-        if self.enum:
-            self.value = prompt({
-                'type': 'select',
-                'name': self.name,
-                'message': f"{self.name} (string): [{self.default or ""}]",
-                'choices': self.enum
-            }).get(self.name)
-        else:
-            self.value = prompt({
-                'type': 'input',
-                'name': self.name,
-                'message': f"{self.name} (string): [{self.default or ""}]",
-            }).get(self.name)
+        args = self._get_prompt_args()
+        self.value = prompt(args).get(self.name)
 
 
 class IntegerProperty(Property):
     type: str = 'integer'
     format: Optional[str] = None
-    default: Optional[int] = None
     enum: Optional[List[int]] = None
 
     @classmethod
@@ -83,20 +89,19 @@ class IntegerProperty(Property):
             path=parse(parent + key)
         )
 
+    def _get_prompt_args(self):
+        args = {
+            'type': 'select' if self.enum else 'input',
+            'name': self.name,
+            'message': f"{self.name} ({self.type}): ",
+            'choices': self.enum,
+            'default': self.default
+        }
+        return {k: v for k, v in args.items() if v is not None}
+
     def prompt(self):
-        if self.enum:
-            self.value = prompt({
-                'type': 'select',
-                'name': self.name,
-                'message': f"{self.name} (int): [{self.default or ""}]",
-                'choices': self.enum
-            }).get(self.name)
-        else:
-            self.value = prompt({
-                'type': 'input',
-                'name': self.name,
-                'message': f"{self.name} (int): [{self.default or ""}]",
-            }).get(self.name)
+        args = self._get_prompt_args()
+        self.value = prompt(args).get(self.name)
 
 
 class ObjectProperty(Property):
@@ -152,7 +157,6 @@ class ObjectProperty(Property):
 
 class BooleanProperty(Property):
     type: str = 'boolean'
-    default: Optional[bool] = False
 
     @classmethod
     def from_dict(cls, key, obj, parent):
@@ -167,7 +171,8 @@ class BooleanProperty(Property):
         self.value = prompt({
             'type': 'confirm',
             'name': self.name,
-            'message': f"{self.name}: [{self.default or False}]",
+            'message': f"{self.name}?",
+            'default': self.default or False
         }).get(self.name)
 
 
@@ -189,6 +194,7 @@ class ArrayProperty(Property):
             'type': 'input',
             'name': self.name,
             'message': f"{self.name} (array):",
+            'default': self.default
         }).get(self.name)
 
 
@@ -219,17 +225,19 @@ class Schema(BaseModel):
                 property.save(data)
             json.dump(data, fp)
 
-    def prompt(self, output_file: str = None):
+    def prompt(self, output_type: str, output_file: str = None):
         try:
             while True:
                 choices = [p.name for p in self.properties]
-                choices.append('Save')
-                choices.append('Exit')
+                choices.append('')
+                choices.append('Discard & Exit')
+                choices.append('Save & Exit')
                 property = questionary.select('Select a property', choices=choices).ask()
-                if property == 'Exit':
+                if property == 'Discard & Exit':
                     exit(0)
-                if property == 'Save':
+                if property == 'Save & Exit':
                     self.save(output_file)
+                    exit(0)
                 for p in self.properties:
                     if p.name == property:
                         p.prompt()
