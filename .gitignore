@@ -1,4 +1,4 @@
 .vscode
 .venv
 __pycache__
-*.schema.json
+examples/output.json

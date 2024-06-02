@@ -1,3 +1,0 @@
-$.fullnameOverride = atlantis
-$.logLevel = warn
-$.github.secret = secret

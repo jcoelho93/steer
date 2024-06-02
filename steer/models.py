@@ -1,8 +1,9 @@
+import json
 import questionary
-from io import TextIOWrapper
+from jsonpath_ng import parse
 from questionary import prompt
-from jsonpath_ng import jsonpath, parse
 from pydantic import BaseModel
+from jsonpath_ng.jsonpath import JSONPath
 from typing import Optional, List, Any, Dict
 
 
@@ -12,7 +13,7 @@ class Property(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     allOf: Optional[List[BaseModel]] = None
-    path: Optional[str] = None
+    path: Optional[Any] = None
     value: Optional[Any] = None
 
     @classmethod
@@ -25,9 +26,9 @@ class Property(BaseModel):
             allOf=obj.get('allOf')
         )
 
-    def save(self, fp: TextIOWrapper):
+    def save(self, data: Any):
         if self.value:
-            fp.write('{} = {}\n'.format(self.path, self.value))
+            self.path.update_or_create(data, self.value)
 
 
 class StringProperty(Property):
@@ -46,7 +47,7 @@ class StringProperty(Property):
             default=obj.get('default'),
             enum=obj.get('enum'),
             pattern=obj.get('pattern'),
-            path=parent + key
+            path=parse(parent + key)
         )
 
     def prompt(self):
@@ -79,7 +80,7 @@ class IntegerProperty(Property):
             format=obj.get('format'),
             default=obj.get('default'),
             enum=obj.get('enum'),
-            path=parent + key
+            path=parse(parent + key)
         )
 
     def prompt(self):
@@ -109,7 +110,7 @@ class ObjectProperty(Property):
             name=key,
             type=obj.get('type', 'object'),
             additionalProperties=bool(obj.get('additionalProperties', False)),
-            path=parent + key
+            path=parse(parent + key)
         )
         if obj.get('properties') is not None:
             return property.with_properties(obj['properties'], parent + key)
@@ -133,9 +134,9 @@ class ObjectProperty(Property):
                 self.add_property(ArrayProperty.from_dict(key, value, parent + '.'))
         return self
 
-    def save(self, fp: TextIOWrapper):
+    def save(self, data: Any):
         for property in self.properties:
-            property.save(fp)
+            property.save(data)
 
     def prompt(self):
         while True:
@@ -159,7 +160,7 @@ class BooleanProperty(Property):
             name=key,
             type=obj.get('type'),
             default=obj.get('default'),
-            path=parent + key
+            path=parse(parent + key)
         )
 
     def prompt(self):
@@ -180,7 +181,7 @@ class ArrayProperty(Property):
             name=key,
             type=obj.get('type'),
             items=obj.get('items'),
-            path=parent + key
+            path=parse(parent + key)
         )
 
     def prompt(self):
@@ -212,9 +213,11 @@ class Schema(BaseModel):
         self.definitions.append(definition)
 
     def save(self, filepath):
+        data = {}
         with open(filepath, 'w') as fp:
             for property in self.properties:
-                property.save(fp)
+                property.save(data)
+            json.dump(data, fp)
 
     def prompt(self, output_file: str = None):
         try:
