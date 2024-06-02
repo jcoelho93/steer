@@ -1,4 +1,4 @@
 .vscode
 .venv
 __pycache__
-values.schema.json
+*.schema.json
