@@ -3,7 +3,6 @@ import questionary
 from jsonpath_ng import parse
 from questionary import prompt
 from pydantic import BaseModel
-from jsonpath_ng.jsonpath import JSONPath
 from typing import Optional, List, Any, Dict
 
 
