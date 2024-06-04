@@ -28,7 +28,7 @@ class Property(BaseModel):
         )
 
     def save(self, data: Any):
-        if self.value:
+        if self.value is not None:
             self.path.update_or_create(data, self.value)
 
     def _get_prompt_args(self):
@@ -95,13 +95,63 @@ class IntegerProperty(Property):
             'name': self.name,
             'message': f"{self.name} ({self.type}): ",
             'choices': self.enum,
-            'default': self.default
+            'default': str(self.default)
         }
         return {k: v for k, v in args.items() if v is not None}
 
     def prompt(self):
         args = self._get_prompt_args()
-        self.value = prompt(args).get(self.name)
+        self.value = int(prompt(args).get(self.name))
+
+
+class BooleanProperty(Property):
+    type: str = 'boolean'
+
+    @classmethod
+    def from_dict(cls, key, obj, parent):
+        return cls(
+            name=key,
+            type=obj.get('type'),
+            default=obj.get('default'),
+            path=parse(parent + key)
+        )
+
+    def prompt(self):
+        value = prompt({
+            'type': 'select',
+            'name': self.name,
+            'message': f"{self.name}?",
+            'choices': ['true', 'false'],
+            'default': str(self.default).lower()
+        }).get(self.name)
+        self.value = value == 'true'
+
+
+class ArrayProperty(Property):
+    type: str = 'array'
+    items: Optional[Property] = None
+
+    @classmethod
+    def from_dict(cls, key, obj, parent):
+        return cls(
+            name=key,
+            type=obj.get('type'),
+            items=obj.get('items'),
+            path=parse(parent + key)
+        )
+
+    def prompt(self):
+        values = prompt({
+            'type': 'input',
+            'name': self.name,
+            'message': f"{self.name} (array):",
+        }).get(self.name)
+        if self.items.get('type') == 'string':
+            self.value = values.split(',')
+        elif self.items.get('type') == 'integer':
+            self.value = [int(v) for v in values.split(',')]
+        else:
+            raise NotImplementedError('Only string and integer arrays are supported')
 
 
 class ObjectProperty(Property):
@@ -153,49 +203,6 @@ class ObjectProperty(Property):
             for p in self.properties:
                 if p.name == property:
                     p.prompt()
-
-
-class BooleanProperty(Property):
-    type: str = 'boolean'
-
-    @classmethod
-    def from_dict(cls, key, obj, parent):
-        return cls(
-            name=key,
-            type=obj.get('type'),
-            default=obj.get('default'),
-            path=parse(parent + key)
-        )
-
-    def prompt(self):
-        self.value = prompt({
-            'type': 'confirm',
-            'name': self.name,
-            'message': f"{self.name}?",
-            'default': self.default or False
-        }).get(self.name)
-
-
-class ArrayProperty(Property):
-    type: str = 'array'
-    items: Optional[Property] = None
-
-    @classmethod
-    def from_dict(cls, key, obj, parent):
-        return cls(
-            name=key,
-            type=obj.get('type'),
-            items=obj.get('items'),
-            path=parse(parent + key)
-        )
-
-    def prompt(self):
-        self.value = prompt({
-            'type': 'input',
-            'name': self.name,
-            'message': f"{self.name} (array):",
-            'default': self.default
-        }).get(self.name)
 
 
 class RefProperty(Property):

@@ -280,7 +280,7 @@
     "allowForkPRs": {
       "type": "boolean",
       "description": "Allow atlantis to run on fork Pull Requests",
-      "default": false
+      "default": true
     },
     "allowDraftPRs": {
       "type": "boolean",
@@ -2428,4 +2428,4 @@
       "additionalProperties": false
     }
   }
-} 
+}

@@ -1,6 +1,5 @@
 import json
 import click
-import questionary
 from io import TextIOWrapper
 from steer.models import Schema
 
