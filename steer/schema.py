@@ -15,7 +15,7 @@ class Property(BaseModel):
     description: Optional[str] = None
     default: Optional[Any] = None
     allOf: Optional[List[BaseModel]] = None
-    path: Optional[Any] = None
+    path: Optional[str] = None
     value: Optional[Any] = None
 
     @classmethod
@@ -30,7 +30,8 @@ class Property(BaseModel):
 
     def save(self, data: Any):
         if self.value is not None:
-            self.path.update_or_create(data, self.value)
+            json_path = parse(self.path)
+            json_path.update_or_create(data, self.value)
 
     def _get_prompt_args(self):
         args = {
@@ -66,7 +67,7 @@ class StringProperty(Property):
             default=obj.get('default'),
             enum=obj.get('enum'),
             pattern=obj.get('pattern'),
-            path=parse(parent + key)
+            path=parent + key
         )
 
     def prompt(self):
@@ -87,7 +88,7 @@ class IntegerProperty(Property):
             format=obj.get('format'),
             default=obj.get('default'),
             enum=obj.get('enum'),
-            path=parse(parent + key)
+            path=parent + key
         )
 
     def _get_prompt_args(self):
@@ -114,7 +115,7 @@ class BooleanProperty(Property):
             name=key,
             type=obj.get('type'),
             default=obj.get('default'),
-            path=parse(parent + key)
+            path=parent + key
         )
 
     def prompt(self):
@@ -138,7 +139,7 @@ class ArrayProperty(Property):
             name=key,
             type=obj.get('type'),
             items=obj.get('items'),
-            path=parse(parent + key)
+            path=parent + key
         )
 
     def prompt(self):
@@ -166,7 +167,7 @@ class ObjectProperty(Property):
             name=key,
             type=obj.get('type', 'object'),
             additionalProperties=bool(obj.get('additionalProperties', False)),
-            path=parse(parent + key)
+            path=parent + key
         )
         if obj.get('properties') is not None:
             return property.with_properties(obj['properties'], parent + key)
