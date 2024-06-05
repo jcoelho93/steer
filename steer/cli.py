@@ -1,7 +1,8 @@
 import json
 import click
 from io import TextIOWrapper
-from steer.models import Schema
+from steer.schema import Schema
+from steer.models import OutputType
 
 
 @click.group()
@@ -9,7 +10,7 @@ def cli():
     pass
 
 
-output_types = ['stdout', 'json', 'yaml']
+output_types = [t.value for t in OutputType]
 
 
 @cli.command(help='Interactively build a values.yml file')
@@ -19,4 +20,4 @@ output_types = ['stdout', 'json', 'yaml']
 def values(json_schema: TextIOWrapper, output_type: str, output_file: str = None):
     content = json.loads(json_schema.read())
     schema = Schema.from_dict(content)
-    schema.prompt(output_type, output_file)
+    schema.prompt(OutputType(output_type), output_file)
