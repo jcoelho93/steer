@@ -14,9 +14,16 @@ Let's say you want to build an OpenAPI specification for an API.
 
 1. Download the OpenAPI json schema from [here](https://github.com/OAI/OpenAPI-Specification/blob/main/schemas/v2.0/schema.json)
 1. Run `steer`:
-    ```shell
-    steer values examples/openapi.schema.json --output-type json --output-file restapi.json
+    ```
+    ~$ steer examples/openapi.schema.json --output-type json --output-file restapi.json
+    ? Select a property (Use arrow keys)
+     » swagger
+       host
+       basePath
+       tags
 
+       Discard & Exit
+       Save & Exit
     ```
 
 ## Roadmap
