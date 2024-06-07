@@ -5,7 +5,7 @@ A tool to help you write JSON and YAML files from JSON schemas
 ## Installation
 
 ```shell
-pip install steer
+pip install python-steer
 ```
 
 ## Usage
@@ -20,9 +20,9 @@ Let's say you want to build an OpenAPI specification for an API.
 ## Roadmap
 
 - [ ] Implement the `array` of `objects` property type
-- [ ] Implement the `$ref` property type
+- [ ] Implement the `$ref` property type
 - [x] Validate string property values with `pattern`
-- [ ] Implement prompt for `additionalProperties`
+- [ ] Implement prompt for `additionalProperties`
 - [ ] Validate `required` fields
 - [ ] Implement `number` property type
-- [ ] Implement `allOf`, `anyOf`, `oneOf` keywords
+- [ ] Implement `allOf`, `anyOf`, `oneOf` keywords
