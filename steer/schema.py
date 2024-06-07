@@ -103,7 +103,18 @@ class IntegerProperty(Property):
 
     def prompt(self):
         args = self._get_prompt_args()
-        self.value = int(prompt(args).get(self.name))
+        while True:
+            try:
+                value = prompt(args).get(self.name)
+                if value is not None:
+                    value = int(value)
+                else:
+                    return
+            except ValueError:
+                print('Invalid value. Must be an integer')
+                continue
+            self.value = value
+            break
 
 
 class BooleanProperty(Property):

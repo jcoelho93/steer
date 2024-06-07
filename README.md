@@ -33,3 +33,4 @@ Let's say you want to build an OpenAPI specification for an API.
 - [x] Validate string property values with `pattern`
 - [ ] Implement prompt for `additionalProperties`
 - [ ] Validate `required` fields
+- [ ] Implement `number` property type
