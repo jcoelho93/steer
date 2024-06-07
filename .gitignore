@@ -4,3 +4,4 @@ __pycache__
 .out/
 .coverage
 .pytest_cache
+dist/
