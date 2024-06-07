@@ -25,3 +25,4 @@ Let's say you want to build an OpenAPI specification for an API.
 - [ ] Implement prompt for `additionalProperties`
 - [ ] Validate `required` fields
 - [ ] Implement `number` property type
+- [ ] Implement `allOf`, `anyOf`, `oneOf` keywords
