@@ -30,6 +30,6 @@ Let's say you want to build an OpenAPI specification for an API.
 
 - [ ] Implement the `array` of `objects` property type
 - [ ] Implement the `$ref` property type
-- [ ] Validate properties values with `pattern` and `format`
+- [x] Validate string property values with `pattern`
 - [ ] Implement prompt for `additionalProperties`
 - [ ] Validate `required` fields

@@ -1,3 +1,4 @@
+import re
 import json
 import yaml
 import questionary
@@ -17,16 +18,6 @@ class Property(BaseModel):
     allOf: Optional[List[BaseModel]] = None
     path: Optional[str] = None
     value: Optional[Any] = None
-
-    @classmethod
-    def from_dict(cls, key, obj):
-        return cls(
-            name=key,
-            type=obj.get('type'),
-            ref=obj.get('$ref'),
-            description=obj.get('description'),
-            allOf=obj.get('allOf')
-        )
 
     def save(self, data: Any):
         if self.value is not None:
@@ -58,8 +49,13 @@ class StringProperty(Property):
         }
         return {k: v for k, v in args.items() if v is not None}
 
+    def _valid_pattern(self, value: str) -> bool:
+        if self.pattern is not None and value is not None:
+            return re.match(self.pattern, value)
+        return True
+
     @classmethod
-    def from_dict(cls, key, obj, parent):
+    def from_dict(cls, key: str, obj: Dict, parent: str):
         return cls(
             name=key,
             type=obj.get('type'),
@@ -72,7 +68,11 @@ class StringProperty(Property):
 
     def prompt(self):
         args = self._get_prompt_args()
-        self.value = prompt(args).get(self.name)
+        value = prompt(args).get(self.name)
+        while not self._valid_pattern(value):
+            print(f"Invalid value. Must match pattern: '{self.pattern}'")
+            value = prompt(args).get(self.name)
+        self.value = value
 
 
 class IntegerProperty(Property):
@@ -213,8 +213,8 @@ class RefProperty(Property):
 
 class Schema(BaseModel):
     schema_url: str
-    type: str = 'object'
-    additionalProperties: bool = False
+    type: Optional[str] = 'object'
+    additionalProperties: Optional[bool] = False
     description: Optional[str] = None
     required: Optional[List[str]] = []
     properties: Optional[List[Property]] = []
@@ -270,7 +270,7 @@ class Schema(BaseModel):
             required=obj.get('required'),
         )
 
-        for key, value in obj.get('definitions', []).items():
+        for key, value in obj.get('definitions', {}).items():
             schema.add_definition(ObjectProperty.from_dict(key, value, '$.'))
 
         for key, value in obj['properties'].items():
