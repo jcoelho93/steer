@@ -32,6 +32,13 @@ class Property(BaseModel):
         }
         return {k: v for k, v in args.items() if v is not None}
 
+    def set_value(self, value: Any):
+        self._validate(value)
+        self.value = value
+
+    def _validate(self, value: Any) -> bool:
+        raise NotImplementedError()
+
 
 class StringProperty(Property):
     type: str = 'string'
@@ -49,9 +56,10 @@ class StringProperty(Property):
         }
         return {k: v for k, v in args.items() if v is not None}
 
-    def _valid_pattern(self, value: str) -> bool:
+    def _validate(self, value: str) -> bool:
         if self.pattern is not None and value is not None:
-            return re.match(self.pattern, value)
+            if not re.match(self.pattern, value):
+                raise ValueError(f"Invalid value. Must match pattern: '{self.pattern}'")
         return True
 
     @classmethod
@@ -68,11 +76,14 @@ class StringProperty(Property):
 
     def prompt(self):
         args = self._get_prompt_args()
-        value = prompt(args).get(self.name)
-        while not self._valid_pattern(value):
-            print(f"Invalid value. Must match pattern: '{self.pattern}'")
+        while True:
             value = prompt(args).get(self.name)
-        self.value = value
+            try:
+                self._validate(value)
+                self.value = value
+            except ValueError as e:
+                print(f"Error: {e}")
+            break
 
 
 class IntegerProperty(Property):
@@ -101,19 +112,26 @@ class IntegerProperty(Property):
         }
         return {k: v for k, v in args.items() if v is not None}
 
+    def _validate(self, value: int) -> bool:
+        validated_value = None
+        try:
+            validated_value = int(value)
+        except ValueError:
+            raise ValueError("Invalid value. Must be an integer")
+        if self.enum and validated_value not in self.enum:
+            raise ValueError(f"Invalid value. Must be one of: {self.enum}")
+
     def prompt(self):
         args = self._get_prompt_args()
         while True:
             try:
                 value = prompt(args).get(self.name)
                 if value is not None:
-                    value = int(value)
-                else:
-                    return
-            except ValueError:
-                print('Invalid value. Must be an integer')
+                    self._validate(value)
+                    self.value = value
+            except ValueError as e:
+                print(f"Error: {e}")
                 continue
-            self.value = value
             break
 
 

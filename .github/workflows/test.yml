@@ -1,0 +1,28 @@
+name: Python tests
+
+on:
+  - push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@v3
+      - name: Set up Python environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      - name: Set up Poetry
+        uses: Gr1N/setup-poetry@v8
+        with:
+          poetry-version: "1.8.2"
+      - name: Install dependencies
+        run: poetry install
+      - name: Run tests and generate coverage report
+        run: poetry run coverage run -m pytest
+      - name: Publish coverage report
+        uses: actions/upload-artifact
+        with:
+          name: coverage
+          path: .coverage
