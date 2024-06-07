@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "steer"
-version = "0.1.0"
-description = ""
+name = "python-steer"
+version = "0.1.2"
+description = "A tool to help you write JSON and YAML files from JSON schemas"
 authors = ["José Coelho <16445494+jcoelho93@users.noreply.github.com>"]
 readme = "README.md"
 
