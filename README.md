@@ -13,18 +13,9 @@ pip install steer
 Let's say you want to build an OpenAPI specification for an API.
 
 1. Download the OpenAPI json schema from [here](https://github.com/OAI/OpenAPI-Specification/blob/main/schemas/v2.0/schema.json)
-1. Run `steer`:
-    ```
-    ~$ steer examples/openapi.schema.json --output-type json --output-file restapi.json
-    ? Select a property (Use arrow keys)
-     » swagger
-       host
-       basePath
-       tags
+1. Run steer from the command line
 
-       Discard & Exit
-       Save & Exit
-    ```
+[![asciicast](https://asciinema.org/a/s7k97RgWaRjhokuT1EZ6SgYlw.svg)](https://asciinema.org/a/s7k97RgWaRjhokuT1EZ6SgYlw)
 
 ## Roadmap
 
