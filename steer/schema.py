@@ -1,6 +1,7 @@
 import re
 import json
 import yaml
+import logging
 import questionary
 from jsonpath_ng import parse
 from questionary import prompt
@@ -38,6 +39,19 @@ class Property(BaseModel):
 
     def _validate(self, value: Any) -> bool:
         raise NotImplementedError()
+
+    def prompt(self):
+        args = self._get_prompt_args()
+        while True:
+            try:
+                value = prompt(args).get(self.name)
+                if value is not None:
+                    self._validate(value)
+                    self.value = value
+            except ValueError as e:
+                print(f"Error: {e}")
+                continue
+            break
 
 
 class StringProperty(Property):
@@ -112,7 +126,7 @@ class IntegerProperty(Property):
         }
         return {k: v for k, v in args.items() if v is not None}
 
-    def _validate(self, value: int) -> bool:
+    def _validate(self, value: str) -> bool:
         validated_value = None
         try:
             validated_value = int(value)
@@ -121,18 +135,44 @@ class IntegerProperty(Property):
         if self.enum and validated_value not in self.enum:
             raise ValueError(f"Invalid value. Must be one of: {self.enum}")
 
-    def prompt(self):
-        args = self._get_prompt_args()
-        while True:
-            try:
-                value = prompt(args).get(self.name)
-                if value is not None:
-                    self._validate(value)
-                    self.value = value
-            except ValueError as e:
-                print(f"Error: {e}")
-                continue
-            break
+
+class NumberProperty(Property):
+    type: str = 'number'
+    format: Optional[str] = None
+    enum: Optional[List[float]] = None
+
+    @classmethod
+    def from_dict(cls, key, obj, parent):
+        return cls(
+            name=key,
+            type=obj.get('type'),
+            format=obj.get('format'),
+            default=obj.get('default'),
+            enum=obj.get('enum'),
+            path=parent + key
+        )
+
+    def _get_prompt_args(self):
+        args = {
+            'type': 'select' if self.enum else 'input',
+            'name': self.name,
+            'message': f"{self.name} ({self.type}): ",
+            'choices': self.enum,
+            'default': str(self.default)
+        }
+        return {k: v for k, v in args.items() if v is not None}
+
+    def _validate(self, value: str) -> bool:
+        validated_value = None
+        try:
+            if '.' in value:
+                validated_value = float(value)
+            else:
+                validated_value = int(value)
+        except ValueError:
+            raise ValueError("Invalid value. Must be an integer")
+        if self.enum and validated_value not in self.enum:
+            raise ValueError(f"Invalid value. Must be one of: {self.enum}")
 
 
 class BooleanProperty(Property):
@@ -161,6 +201,7 @@ class BooleanProperty(Property):
 class ArrayProperty(Property):
     type: str = 'array'
     items: Optional[Property] = None
+    uniqueItems: Optional[bool] = False
 
     @classmethod
     def from_dict(cls, key, obj, parent):
@@ -168,6 +209,7 @@ class ArrayProperty(Property):
             name=key,
             type=obj.get('type'),
             items=obj.get('items'),
+            uniqueItems=obj.get('uniqueItems'),
             path=parent + key
         )
 
@@ -239,6 +281,15 @@ class ObjectProperty(Property):
 class RefProperty(Property):
     type: str = 'ref'
 
+    @classmethod
+    def from_dict(cls, key, obj, parent):
+        return cls(
+            name=key,
+            type=obj.get('type'),
+            ref=obj.get('$ref'),
+            path=parent + key
+        )
+
 
 class Schema(BaseModel):
     schema_url: str
@@ -303,17 +354,22 @@ class Schema(BaseModel):
             schema.add_definition(ObjectProperty.from_dict(key, value, '$.'))
 
         for key, value in obj['properties'].items():
-            if value.get('type') == 'string':
-                schema.add_property(StringProperty.from_dict(key, value, '$.'))
-            elif value.get('type') == 'integer':
-                schema.add_property(IntegerProperty.from_dict(key, value, '$.'))
-            elif value.get('type') == 'object':
-                schema.add_property(ObjectProperty.from_dict(key, value, '$.'))
-            elif value.get('type') == 'boolean':
-                schema.add_property(BooleanProperty.from_dict(key, value, '$.'))
-            elif value.get('type') == 'array':
-                schema.add_property(ArrayProperty.from_dict(key, value, '$.'))
-            elif value.get('type') == 'ref':
-                schema.add_property(RefProperty.from_dict(key, value, '$.'))
+            match value.get('type'):
+                case 'string':
+                    schema.add_property(StringProperty.from_dict(key, value, '$.'))
+                case 'integer':
+                    schema.add_property(IntegerProperty.from_dict(key, value, '$.'))
+                case 'number':
+                    schema.add_property(NumberProperty.from_dict(key, value, '$.'))
+                case 'object':
+                    schema.add_property(ObjectProperty.from_dict(key, value, '$.'))
+                case 'boolean':
+                    schema.add_property(BooleanProperty.from_dict(key, value, '$.'))
+                case 'array':
+                    schema.add_property(ArrayProperty.from_dict(key, value, '$.'))
+                case 'ref':
+                    schema.add_property(RefProperty.from_dict(key, value, '$.'))
+                case _:
+                    logging.warn(f"Type {value.get('type')} not supported")
 
         return schema

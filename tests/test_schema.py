@@ -1,6 +1,6 @@
 import unittest
 from unittest import TestCase
-from steer.schema import Schema, StringProperty, IntegerProperty
+from steer.schema import Schema, StringProperty, IntegerProperty, NumberProperty
 
 
 schema_dict = {
@@ -74,6 +74,23 @@ class TestSchema(TestCase):
 
         with self.assertRaises(ValueError):
             int_property.set_value("4")
+
+    def test_numbers(self):
+        number_property = NumberProperty.from_dict(
+            "number",
+            {
+                'type': 'number',
+                'enum': [1.321, 2, 3.0]
+            },
+            "$"
+        )
+        with self.assertRaises(ValueError):
+            number_property.set_value("4.2342")
+
+        try:
+            number_property.set_value("2")
+        except Exception:
+            self.fail("Should not raise an exception")
 
 
 if __name__ == '__main__':
