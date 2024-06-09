@@ -37,7 +37,7 @@ class Property(BaseModel):
         self._validate(value)
         self.value = value
 
-    def _validate(self, value: Any) -> bool:
+    def _validate(self, value: Any) -> Any:
         raise NotImplementedError()
 
     def prompt(self):
@@ -46,8 +46,7 @@ class Property(BaseModel):
             try:
                 value = prompt(args).get(self.name)
                 if value is not None:
-                    self._validate(value)
-                    self.value = value
+                    self.value = self._validate(value)
             except ValueError as e:
                 print(f"Error: {e}")
                 continue
@@ -126,7 +125,7 @@ class IntegerProperty(Property):
         }
         return {k: v for k, v in args.items() if v is not None}
 
-    def _validate(self, value: str) -> bool:
+    def _validate(self, value: str) -> int:
         validated_value = None
         try:
             validated_value = int(value)
@@ -134,6 +133,7 @@ class IntegerProperty(Property):
             raise ValueError("Invalid value. Must be an integer")
         if self.enum and validated_value not in self.enum:
             raise ValueError(f"Invalid value. Must be one of: {self.enum}")
+        return validated_value
 
 
 class NumberProperty(Property):
@@ -162,7 +162,7 @@ class NumberProperty(Property):
         }
         return {k: v for k, v in args.items() if v is not None}
 
-    def _validate(self, value: str) -> bool:
+    def _validate(self, value: str) -> float:
         validated_value = None
         try:
             if '.' in value:
@@ -173,6 +173,7 @@ class NumberProperty(Property):
             raise ValueError("Invalid value. Must be an integer")
         if self.enum and validated_value not in self.enum:
             raise ValueError(f"Invalid value. Must be one of: {self.enum}")
+        return validated_value
 
 
 class BooleanProperty(Property):
@@ -187,14 +188,20 @@ class BooleanProperty(Property):
             path=parent + key
         )
 
-    def prompt(self):
-        value = prompt({
+    def _get_prompt_args(self):
+        args = {
             'type': 'select',
             'name': self.name,
             'message': f"{self.name}?",
             'choices': ['true', 'false'],
-            'default': str(self.default).lower()
-        }).get(self.name)
+        }
+        if self.default is not None:
+            args['default'] = 'true' if self.default else 'false'
+        return {k: v for k, v in args.items() if v is not None}
+
+    def prompt(self):
+        args = self._get_prompt_args()
+        value = prompt(args).get(self.name)
         self.value = value == 'true'
 
 
@@ -214,17 +221,29 @@ class ArrayProperty(Property):
         )
 
     def prompt(self):
-        values = prompt({
-            'type': 'input',
-            'name': self.name,
-            'message': f"{self.name} (array):",
-        }).get(self.name)
-        if self.items.get('type') == 'string':
-            self.value = values.split(',')
-        elif self.items.get('type') == 'integer':
-            self.value = [int(v) for v in values.split(',')]
-        else:
-            raise NotImplementedError('Only string and integer arrays are supported')
+        elements = []
+        while True:
+            if self.items.type == 'integer':
+                property = IntegerProperty.from_dict('Array element:', self.items.model_dump(), '.')
+            elif self.items.type == 'string':
+                property = StringProperty.from_dict('Array element:', self.items.model_dump(), '.')
+            elif self.items.type == 'number':
+                property = NumberProperty.from_dict('Array element:', self.items.model_dump(), '.')
+            elif self.items.type == 'boolean':
+                property = BooleanProperty.from_dict('Array element:', self.items.model_dump(), '.')
+            else:
+                raise NotImplementedError()
+            property.prompt()
+            elements.append(property)
+            if not self._add_more_elements():
+                break
+            else:
+                continue
+        self.value = [value.value for value in elements]
+
+    def _add_more_elements(self):
+        answer = questionary.select("Add more elements?", choices=['Yes', 'No']).ask()
+        return answer == 'Yes'
 
 
 class ObjectProperty(Property):
