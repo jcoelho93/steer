@@ -3,7 +3,8 @@
 ![PyPI - Version](https://img.shields.io/pypi/v/python-steer)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/python-steer)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/python-steer)
-
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=jcoelho93_steer&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=jcoelho93_steer)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=jcoelho93_steer&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=jcoelho93_steer)
 
 A CLI tool to interactively generate JSON and YAML files from JSON schemas
 
