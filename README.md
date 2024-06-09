@@ -19,7 +19,8 @@ Let's say you want to build an OpenAPI specification for an API.
 
 ## Roadmap
 
-- [ ] Implement the `array` of `objects` property type
+- [x] Implement prompt for `array` of `string`, `number` and `integer` property type
+- [ ] Implement prompt for `array` of `object` property type
 - [ ] Implement the `$ref` property type
 - [x] Validate string property values with `pattern`
 - [ ] Implement prompt for `additionalProperties`
