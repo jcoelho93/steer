@@ -1,3 +1,5 @@
+name: Publish
+
 on:
     release:
       types:
@@ -5,7 +7,7 @@ on:
 
 jobs:
   pypi-publish:
-    name: Upload release to Pypi
+    name: Pypi
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
