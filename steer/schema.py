@@ -7,7 +7,7 @@ from jsonpath_ng import parse
 from questionary import prompt
 from pydantic import BaseModel
 from steer.models import OutputType
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Union
 
 
 class Property(BaseModel):
@@ -121,7 +121,7 @@ class IntegerProperty(Property):
             'name': self.name,
             'message': f"{self.name} ({self.type}): ",
             'choices': self.enum,
-            'default': str(self.default)
+            'default': self.default
         }
         return {k: v for k, v in args.items() if v is not None}
 
@@ -207,7 +207,7 @@ class BooleanProperty(Property):
 
 class ArrayProperty(Property):
     type: str = 'array'
-    items: Optional[Property] = None
+    items: Optional[Union[StringProperty, IntegerProperty, NumberProperty]] = None
     uniqueItems: Optional[bool] = False
 
     @classmethod
@@ -215,7 +215,7 @@ class ArrayProperty(Property):
         return cls(
             name=key,
             type=obj.get('type'),
-            items=obj.get('items'),
+            items=PropertyFactory.get_property(key, obj.get('items'), parent),
             uniqueItems=obj.get('uniqueItems'),
             path=parent + key
         )
@@ -223,18 +223,12 @@ class ArrayProperty(Property):
     def prompt(self):
         elements = []
         while True:
-            if self.items.type == 'integer':
-                property = IntegerProperty.from_dict('Array element:', self.items.model_dump(), '.')
-            elif self.items.type == 'string':
-                property = StringProperty.from_dict('Array element:', self.items.model_dump(), '.')
-            elif self.items.type == 'number':
-                property = NumberProperty.from_dict('Array element:', self.items.model_dump(), '.')
-            elif self.items.type == 'boolean':
-                property = BooleanProperty.from_dict('Array element:', self.items.model_dump(), '.')
-            else:
-                raise NotImplementedError()
-            property.prompt()
-            elements.append(property)
+            try:
+                prop = PropertyFactory.get_property('Array element:', self.items.model_dump(), '.')
+                prop.prompt()
+            except NotImplementedError:
+                continue
+            elements.append(prop)
             if not self._add_more_elements():
                 break
             else:
@@ -269,16 +263,11 @@ class ObjectProperty(Property):
 
     def with_properties(self, properties, parent):
         for key, value in properties.items():
-            if value.get('type') == 'string':
-                self.add_property(StringProperty.from_dict(key, value, parent + '.'))
-            elif value.get('type') == 'integer':
-                self.add_property(IntegerProperty.from_dict(key, value, parent + '.'))
-            elif value.get('type') == 'object':
-                self.add_property(ObjectProperty.from_dict(key, value, parent + '.'))
-            elif value.get('type') == 'boolean':
-                self.add_property(BooleanProperty.from_dict(key, value, parent + '.'))
-            elif value.get('type') == 'array':
-                self.add_property(ArrayProperty.from_dict(key, value, parent + '.'))
+            try:
+                prop = PropertyFactory.get_property(key, value, parent + '.')
+                self.add_property(prop)
+            except NotImplementedError:
+                continue
         return self
 
     def save(self, data: Any):
@@ -297,17 +286,17 @@ class ObjectProperty(Property):
                     p.prompt()
 
 
-class RefProperty(Property):
-    type: str = 'ref'
+class Reference:
+    reference: str
 
-    @classmethod
-    def from_dict(cls, key, obj, parent):
-        return cls(
-            name=key,
-            type=obj.get('type'),
-            ref=obj.get('$ref'),
-            path=parent + key
-        )
+    def __init__(self, ref: str):
+        self.ref = ref
+
+    def get_reference(self, definitions: List[Property]) -> Property:
+        reference_name = self.ref.split('/')[-1]
+        for definition in definitions:
+            if definition.name == reference_name:
+                return definition
 
 
 class Schema(BaseModel):
@@ -370,25 +359,43 @@ class Schema(BaseModel):
         )
 
         for key, value in obj.get('definitions', {}).items():
-            schema.add_definition(ObjectProperty.from_dict(key, value, '$.'))
+            try:
+                definition = PropertyFactory.get_property(key, value, '$.', schema)
+                schema.add_definition(definition)
+            except NotImplementedError:
+                continue
 
         for key, value in obj['properties'].items():
-            match value.get('type'):
-                case 'string':
-                    schema.add_property(StringProperty.from_dict(key, value, '$.'))
-                case 'integer':
-                    schema.add_property(IntegerProperty.from_dict(key, value, '$.'))
-                case 'number':
-                    schema.add_property(NumberProperty.from_dict(key, value, '$.'))
-                case 'object':
-                    schema.add_property(ObjectProperty.from_dict(key, value, '$.'))
-                case 'boolean':
-                    schema.add_property(BooleanProperty.from_dict(key, value, '$.'))
-                case 'array':
-                    schema.add_property(ArrayProperty.from_dict(key, value, '$.'))
-                case 'ref':
-                    schema.add_property(RefProperty.from_dict(key, value, '$.'))
-                case _:
-                    logging.warn(f"Type {value.get('type')} not supported")
+            try:
+                prop = PropertyFactory.get_property(key, value, '$.', schema)
+                schema.add_property(prop)
+            except NotImplementedError:
+                continue
 
         return schema
+
+
+class PropertyFactory:
+    @classmethod
+    def get_property(self, key: str, obj: Dict, parent: str, schema: Schema = None):
+        if obj.get('$ref') and schema is not None:
+            ref = Reference(obj.get('$ref'))
+            prop = ref.get_reference(schema.definitions)
+            return prop
+
+        match obj.get('type'):
+            case 'string':
+                return StringProperty.from_dict(key, obj, parent)
+            case 'integer':
+                return IntegerProperty.from_dict(key, obj, parent)
+            case 'number':
+                return NumberProperty.from_dict(key, obj, parent)
+            case 'object':
+                return ObjectProperty.from_dict(key, obj, parent)
+            case 'boolean':
+                return BooleanProperty.from_dict(key, obj, parent)
+            case 'array':
+                return ArrayProperty.from_dict(key, obj, parent)
+            case _:
+                logging.warn(f"Type {type} not supported")
+                raise NotImplementedError(f"Type {type} not supported yet")

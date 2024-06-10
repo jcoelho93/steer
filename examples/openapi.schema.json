@@ -78,6 +78,15 @@
     }
   },
   "definitions": {
+    "schemesList": {
+      "type": "array",
+      "description": "The transfer protocol of the API.",
+      "items": {
+        "type": "string",
+        "enum": ["http", "https", "ws", "wss"]
+      },
+      "uniqueItems": true
+    },
     "info": {
       "type": "object",
       "description": "General information about the API.",
@@ -1378,15 +1387,6 @@
             "$ref": "#/definitions/jsonReference"
           }
         ]
-      },
-      "uniqueItems": true
-    },
-    "schemesList": {
-      "type": "array",
-      "description": "The transfer protocol of the API.",
-      "items": {
-        "type": "string",
-        "enum": ["http", "https", "ws", "wss"]
       },
       "uniqueItems": true
     },
