@@ -23,7 +23,10 @@ json_schema = {
         },
         "address": {
             "$ref": "#/definitions/address"
-        }
+        },
+        "multipleOf": {
+            "$ref": "https://json-schema.org/draft-04/schema#/properties/multipleOf"
+        },
     },
     "definitions": {
         "name": {
@@ -76,6 +79,12 @@ class TestRefProperty(unittest.TestCase):
         self.assertEqual(prop.type, 'object')
         for p in prop.properties:
             self.assertIsInstance(p, StringProperty)
+
+    def test_url_reference_property(self):
+        prop = self.schema.properties[5]
+
+        self.assertEqual(prop.name, 'multipleOf')
+        self.assertEqual(prop.type, 'number')
 
 
 if __name__ == '__main__':

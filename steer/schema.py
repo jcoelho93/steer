@@ -2,6 +2,7 @@ import re
 import json
 import yaml
 import logging
+import requests
 import questionary
 from jsonpath_ng import parse
 from questionary import prompt
@@ -289,11 +290,29 @@ class ObjectProperty(Property):
 class Reference:
     reference: str
 
-    def __init__(self, ref: str):
-        self.ref = ref
+    def __init__(self, reference: str):
+        self.reference = reference
 
-    def get_reference(self, definitions: List[Property]) -> Property:
-        reference_name = self.ref.split('/')[-1]
+    def to_property(self, definitions: List[Property], name: str = '') -> Property:
+        if self.reference.startswith("https://") or self.reference.startswith("http://"):
+            return self._get_url_reference(name)
+        elif self.reference.startswith('#/definitions/'):
+            return self._get_path_reference(definitions)
+
+    def _get_url_reference(self, name: str) -> Dict:
+        try:
+            response = requests.get(self.reference)
+            response.raise_for_status()
+            schema = response.json()
+            path = '$.' + self.reference.split('#')[1].replace('/', '.')
+            obj = parse(path).find(schema)[0].value
+            return PropertyFactory.get_property(name, obj, '$.')
+        except requests.exceptions.HTTPError as e:
+            logging.error(f"Error fetching schema: {e}")
+            raise e
+
+    def _get_path_reference(self, definitions: List[Property]) -> Property:
+        reference_name = self.reference.split('/')[-1]
         for definition in definitions:
             if definition.name == reference_name:
                 return definition
@@ -380,7 +399,7 @@ class PropertyFactory:
     def get_property(self, key: str, obj: Dict, parent: str, schema: Schema = None):
         if obj.get('$ref') and schema is not None:
             ref = Reference(obj.get('$ref'))
-            prop = ref.get_reference(schema.definitions)
+            prop = ref.to_property(schema.definitions, key)
             return prop
 
         match obj.get('type'):
