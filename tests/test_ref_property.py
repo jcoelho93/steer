@@ -1,7 +1,8 @@
 import unittest
 from steer.schema import (
     Schema, ObjectProperty, StringProperty,
-    IntegerProperty, NumberProperty, BooleanProperty
+    IntegerProperty, NumberProperty, BooleanProperty,
+    ArrayProperty
 )
 
 
@@ -27,6 +28,9 @@ json_schema = {
         "multipleOf": {
             "$ref": "https://json-schema.org/draft-04/schema#/properties/multipleOf"
         },
+        "enum": {
+            "$ref": "https://json-schema.org/draft-04/schema#/properties/enum"
+        }
     },
     "definitions": {
         "name": {
@@ -60,6 +64,29 @@ json_schema = {
     }
 }
 
+array_of_ref = {
+    "$schema": "https://example.com",
+    "type": "object",
+    "properties": {
+       "security": {
+           "type": "array",
+           "items": {
+               "$ref": "#/definitions/securityRequirement"
+           }
+       }
+    },
+    "definitions": {
+        "securityRequirement": {
+            "type": "object",
+            "properties": {
+                "authentication": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}
+
 
 class TestRefProperty(unittest.TestCase):
     def setUp(self):
@@ -85,6 +112,16 @@ class TestRefProperty(unittest.TestCase):
 
         self.assertEqual(prop.name, 'multipleOf')
         self.assertEqual(prop.type, 'number')
+
+    def test_array_of_reference_property(self):
+        schema = Schema.from_dict(array_of_ref)
+
+        prop = schema.properties[0]
+
+        self.assertEqual(prop.name, 'security')
+        self.assertEqual(prop.type, 'array')
+        self.assertIsInstance(prop, ArrayProperty)
+        self.assertIsInstance(prop.items, ObjectProperty)
 
 
 if __name__ == '__main__':

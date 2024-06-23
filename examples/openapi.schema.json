@@ -78,6 +78,26 @@
     }
   },
   "definitions": {
+    "securityRequirement": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "uniqueItems": true
+      }
+    },
+    "security": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/securityRequirement"
+      },
+      "uniqueItems": true
+    },
+    "enum": {
+      "$ref": "http://json-schema.org/draft-04/schema#/properties/enum"
+    },
     "schemesList": {
       "type": "array",
       "description": "The transfer protocol of the API.",
@@ -1101,23 +1121,6 @@
         }
       }
     },
-    "security": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/securityRequirement"
-      },
-      "uniqueItems": true
-    },
-    "securityRequirement": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "uniqueItems": true
-      }
-    },
     "xml": {
       "type": "object",
       "additionalProperties": false,
@@ -1441,9 +1444,6 @@
     },
     "uniqueItems": {
       "$ref": "http://json-schema.org/draft-04/schema#/properties/uniqueItems"
-    },
-    "enum": {
-      "$ref": "http://json-schema.org/draft-04/schema#/properties/enum"
     },
     "jsonReference": {
       "type": "object",

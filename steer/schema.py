@@ -1,14 +1,19 @@
+import os
 import re
 import json
 import yaml
 import logging
 import requests
 import questionary
+import requests_cache
 from jsonpath_ng import parse
 from questionary import prompt
 from pydantic import BaseModel
 from steer.models import OutputType
-from typing import Optional, List, Any, Dict, Union
+from typing import Optional, List, Any, Dict
+
+
+logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'))
 
 
 class Property(BaseModel):
@@ -20,6 +25,8 @@ class Property(BaseModel):
     allOf: Optional[List[BaseModel]] = None
     path: Optional[str] = None
     value: Optional[Any] = None
+
+    parent_schema: Optional[Any] = None
 
     def save(self, data: Any):
         if self.value is not None:
@@ -77,7 +84,7 @@ class StringProperty(Property):
         return True
 
     @classmethod
-    def from_dict(cls, key: str, obj: Dict, parent: str):
+    def from_dict(cls, key: str, obj: Dict, parent: str, schema: Any = None):
         return cls(
             name=key,
             type=obj.get('type'),
@@ -85,7 +92,8 @@ class StringProperty(Property):
             default=obj.get('default'),
             enum=obj.get('enum'),
             pattern=obj.get('pattern'),
-            path=parent + key
+            path=parent + key,
+            schema=schema
         )
 
     def prompt(self):
@@ -106,14 +114,15 @@ class IntegerProperty(Property):
     enum: Optional[List[int]] = None
 
     @classmethod
-    def from_dict(cls, key, obj, parent):
+    def from_dict(cls, key, obj, parent, schema: Any = None):
         return cls(
             name=key,
             type=obj.get('type'),
             format=obj.get('format'),
             default=obj.get('default'),
             enum=obj.get('enum'),
-            path=parent + key
+            path=parent + key,
+            schema=schema
         )
 
     def _get_prompt_args(self):
@@ -143,14 +152,15 @@ class NumberProperty(Property):
     enum: Optional[List[float]] = None
 
     @classmethod
-    def from_dict(cls, key, obj, parent):
+    def from_dict(cls, key, obj, parent, schema: Any = None):
         return cls(
             name=key,
             type=obj.get('type'),
             format=obj.get('format'),
             default=obj.get('default'),
             enum=obj.get('enum'),
-            path=parent + key
+            path=parent + key,
+            schema=schema
         )
 
     def _get_prompt_args(self):
@@ -181,12 +191,13 @@ class BooleanProperty(Property):
     type: str = 'boolean'
 
     @classmethod
-    def from_dict(cls, key, obj, parent):
+    def from_dict(cls, key, obj, parent, schema: Any = None):
         return cls(
             name=key,
             type=obj.get('type'),
             default=obj.get('default'),
-            path=parent + key
+            path=parent + key,
+            schema=schema
         )
 
     def _get_prompt_args(self):
@@ -208,17 +219,20 @@ class BooleanProperty(Property):
 
 class ArrayProperty(Property):
     type: str = 'array'
-    items: Optional[Union[StringProperty, IntegerProperty, NumberProperty]] = None
+    minItems: Optional[int] = 0
+    items: Optional[Property] = None
     uniqueItems: Optional[bool] = False
 
     @classmethod
-    def from_dict(cls, key, obj, parent):
+    def from_dict(cls, key, obj, parent, schema: Any = None):
         return cls(
             name=key,
             type=obj.get('type'),
-            items=PropertyFactory.get_property(key, obj.get('items'), parent),
+            items=PropertyFactory.get_property(key, obj.get('items'), '.', schema) if 'items' in obj else None,
             uniqueItems=obj.get('uniqueItems'),
-            path=parent + key
+            minItems=obj.get('minItems'),
+            path=parent + key,
+            schema=schema
         )
 
     def prompt(self):
@@ -247,12 +261,13 @@ class ObjectProperty(Property):
     properties: Optional[List[Property]] = []
 
     @classmethod
-    def from_dict(cls, key, obj, parent):
+    def from_dict(cls, key, obj, parent, schema: Any = None):
         property = cls(
             name=key,
             type=obj.get('type', 'object'),
             additionalProperties=bool(obj.get('additionalProperties', False)),
-            path=parent + key
+            path=parent + key,
+            schema=schema
         )
         if obj.get('properties') is not None:
             return property.with_properties(obj['properties'], parent + key)
@@ -260,7 +275,8 @@ class ObjectProperty(Property):
         return property
 
     def add_property(self, property: Property):
-        self.properties.append(property)
+        if property is not None:
+            self.properties.append(property)
 
     def with_properties(self, properties, parent):
         for key, value in properties.items():
@@ -290,10 +306,11 @@ class ObjectProperty(Property):
 class Reference:
     reference: str
 
-    def __init__(self, reference: str):
+    def __init__(self, reference: str, session: requests.Session = None):
         self.reference = reference
+        self.session = session
 
-    def to_property(self, definitions: List[Property], name: str = '') -> Property:
+    def to_property(self, definitions: List[Property] = [], name: str = '') -> Property:
         if self.reference.startswith("https://") or self.reference.startswith("http://"):
             return self._get_url_reference(name)
         elif self.reference.startswith('#/definitions/'):
@@ -301,7 +318,7 @@ class Reference:
 
     def _get_url_reference(self, name: str) -> Dict:
         try:
-            response = requests.get(self.reference)
+            response = self.session.get(self.reference)
             response.raise_for_status()
             schema = response.json()
             path = '$.' + self.reference.split('#')[1].replace('/', '.')
@@ -378,6 +395,7 @@ class Schema(BaseModel):
         )
 
         for key, value in obj.get('definitions', {}).items():
+            logging.debug("Loading definition '%s' to schema", key)
             try:
                 definition = PropertyFactory.get_property(key, value, '$.', schema)
                 schema.add_definition(definition)
@@ -385,6 +403,7 @@ class Schema(BaseModel):
                 continue
 
         for key, value in obj['properties'].items():
+            logging.debug("Loading property '%s' to schema", key)
             try:
                 prop = PropertyFactory.get_property(key, value, '$.', schema)
                 schema.add_property(prop)
@@ -395,26 +414,31 @@ class Schema(BaseModel):
 
 
 class PropertyFactory:
+    session = requests_cache.CachedSession()
+
     @classmethod
     def get_property(self, key: str, obj: Dict, parent: str, schema: Schema = None):
-        if obj.get('$ref') and schema is not None:
-            ref = Reference(obj.get('$ref'))
-            prop = ref.to_property(schema.definitions, key)
+        assert obj is not None, f"Property '{key}' object cannot be None"
+        if obj.get('$ref'):
+            ref = Reference(obj.get('$ref'), self.session)
+            if schema is not None:
+                prop = ref.to_property(schema.definitions, key)
+            else:
+                prop = ref.to_property(name=key)
             return prop
 
         match obj.get('type'):
             case 'string':
-                return StringProperty.from_dict(key, obj, parent)
+                return StringProperty.from_dict(key, obj, parent, schema)
             case 'integer':
-                return IntegerProperty.from_dict(key, obj, parent)
+                return IntegerProperty.from_dict(key, obj, parent, schema)
             case 'number':
-                return NumberProperty.from_dict(key, obj, parent)
+                return NumberProperty.from_dict(key, obj, parent, schema)
             case 'object':
-                return ObjectProperty.from_dict(key, obj, parent)
+                return ObjectProperty.from_dict(key, obj, parent, schema)
             case 'boolean':
-                return BooleanProperty.from_dict(key, obj, parent)
+                return BooleanProperty.from_dict(key, obj, parent, schema)
             case 'array':
-                return ArrayProperty.from_dict(key, obj, parent)
+                return ArrayProperty.from_dict(key, obj, parent, schema)
             case _:
-                logging.warn(f"Type {type} not supported")
-                raise NotImplementedError(f"Type {type} not supported yet")
+                raise NotImplementedError(f"Type {obj.get('type')} not supported yet")

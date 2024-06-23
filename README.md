@@ -33,7 +33,7 @@ It is usable for a few use cases without major issues.
 - [ ] Implement prompt for `array` of `object` property type
 - [ ] Implement the `$ref` property type
 - [x] Validate string property values with `pattern`
-- [ ] Implement prompt for `additionalProperties`
+- [ ] Implement object with `additionalProperties`
 - [ ] Validate `required` fields
 - [x] Implement `number` property type
 - [ ] Implement `allOf`, `anyOf`, `oneOf` keywords
